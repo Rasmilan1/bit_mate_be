@@ -1,0 +1,17 @@
+# Environment variables
+.env
+.env.local
+
+# Node Dependencies
+node_modules
+
+# Storage & Local DB Data
+data/uploads/*
+!data/uploads/.gitkeep
+data/local_db.json
+
+# Logs & IDE
+*.log
+.DS_Store
+.vscode
+.idea
