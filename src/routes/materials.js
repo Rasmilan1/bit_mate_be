@@ -106,12 +106,12 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
           title: title.trim(),
           subject_id: isValidUuid ? subject_id : null,
           week_info: week_info || '',
-          file_url: fileUrl,
-          file_path: fileName,
-          file_size: fileSize,
+          file_url: fileUrl || '',
+          file_path: fileName || '',
+          file_size: fileSize || 0,
           total_pages: parseInt(total_pages) || 1,
           current_page: 1,
-          status: fileUrl ? 'unread' : 'no_pdf',
+          status: 'unread',
           tags: tagList
         };
 
