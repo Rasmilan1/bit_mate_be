@@ -173,13 +173,18 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
 router.put('/:id', upload.single('pdfFile'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, subject_id, week_info, tags } = req.body;
+    const { title, subject_id, week_info, tags, file_url, file_path, file_size, status } = req.body || {};
     const file = req.file;
 
     const updates = {};
     if (title !== undefined) updates.title = title;
     if (subject_id !== undefined) updates.subject_id = subject_id || null;
     if (week_info !== undefined) updates.week_info = week_info;
+    if (file_url !== undefined) updates.file_url = file_url;
+    if (file_path !== undefined) updates.file_path = file_path;
+    if (file_size !== undefined) updates.file_size = file_size;
+    if (status !== undefined) updates.status = status;
+    if (file_url) updates.status = 'unread';
     if (tags !== undefined) {
       updates.tags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (tags || []);
     }
