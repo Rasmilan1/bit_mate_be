@@ -39,16 +39,16 @@ router.get('/', async (req, res) => {
 // POST upload new PDF material (or create text/placeholder study entry)
 router.post('/upload', upload.single('pdfFile'), async (req, res) => {
   try {
-    const { title, subject_id, tags, total_pages, week_info } = req.body;
+    const { title, subject_id, tags, total_pages, week_info, file_url: bodyFileUrl, file_path: bodyFilePath, file_size: bodyFileSize } = req.body || {};
     const file = req.file;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    let fileUrl = null;
-    let fileName = '';
-    let fileSize = 0;
+    let fileUrl = bodyFileUrl || null;
+    let fileName = bodyFilePath || '';
+    let fileSize = bodyFileSize || 0;
 
     if (file) {
       const fileExt = path.extname(file.originalname) || '.pdf';
