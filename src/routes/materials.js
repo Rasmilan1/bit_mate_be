@@ -53,10 +53,15 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
     if (file) {
       const fileExt = path.extname(file.originalname) || '.pdf';
       fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}${fileExt}`;
-      const localFilePath = path.join(UPLOADS_DIR, fileName);
-      fs.writeFileSync(localFilePath, file.buffer);
-      fileUrl = `/uploads/${fileName}`;
       fileSize = file.size;
+
+      try {
+        const localFilePath = path.join(UPLOADS_DIR, fileName);
+        fs.writeFileSync(localFilePath, file.buffer);
+        fileUrl = `/uploads/${fileName}`;
+      } catch (err) {
+        console.warn('Local disk write skipped on serverless:', err.message);
+      }
     }
 
     const tagList = typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (tags || []);
@@ -172,11 +177,16 @@ router.put('/:id', upload.single('pdfFile'), async (req, res) => {
     if (file) {
       const fileExt = path.extname(file.originalname) || '.pdf';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}${fileExt}`;
-      const localFilePath = path.join(UPLOADS_DIR, fileName);
-      fs.writeFileSync(localFilePath, file.buffer);
       
-      updates.file_url = `/uploads/${fileName}`;
-      updates.file_path = fileName;
+      try {
+        const localFilePath = path.join(UPLOADS_DIR, fileName);
+        fs.writeFileSync(localFilePath, file.buffer);
+        updates.file_url = `/uploads/${fileName}`;
+        updates.file_path = fileName;
+      } catch (err) {
+        console.warn('Local disk write skipped on serverless:', err.message);
+      }
+
       updates.file_size = file.size;
       updates.status = 'unread';
 
