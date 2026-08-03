@@ -9,10 +9,10 @@ router.get('/', async (req, res) => {
   try {
     if (isConfigured && supabase) {
       const { data, error } = await supabase.from('semesters').select('*').order('created_at', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return res.json(data);
       }
-      console.warn('Supabase semesters fetch notice, using localDb semesters:', error ? error.message : 'No rows');
+      console.warn('Supabase semesters fetch error, using localDb semesters:', error ? error.message : 'No data');
     }
     return res.json(localDb.semesters || []);
   } catch (err) {

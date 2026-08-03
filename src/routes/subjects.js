@@ -28,10 +28,10 @@ router.get('/', async (req, res) => {
         query = query.eq('semester_id', semester_id);
       }
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return res.json(sortSubjects(data));
       }
-      console.warn('Supabase subjects fetch notice, using localDb subjects:', error ? error.message : 'No rows');
+      console.warn('Supabase subjects fetch error, using localDb subjects:', error ? error.message : 'No data');
     }
     
     let allSubjects = localDb.subjects || [];

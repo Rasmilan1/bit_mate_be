@@ -24,10 +24,10 @@ router.get('/', async (req, res) => {
   try {
     if (isConfigured && supabase) {
       const { data, error } = await supabase.from('materials').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return res.json(sortMaterials(data));
       }
-      console.warn('Supabase materials fetch notice, using localDb materials:', error ? error.message : 'No rows');
+      console.warn('Supabase materials fetch error, using localDb materials:', error ? error.message : 'No data');
     }
     return res.json(sortMaterials(localDb.materials || []));
   } catch (err) {
