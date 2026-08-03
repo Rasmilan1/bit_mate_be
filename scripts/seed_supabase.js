@@ -101,7 +101,14 @@ async function syncToSupabase() {
     const isValidMatUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mat.id);
     if (isValidMatUuid) matPayload.id = mat.id;
 
-    const { data, error } = await supabase.from('materials').upsert([matPayload]).select();
+    let status = mat.status || 'unread';
+    let { data, error } = await supabase.from('materials').upsert([{ ...matPayload, status }]).select();
+    if (error && error.message.includes('materials_status_check')) {
+      const retry = await supabase.from('materials').upsert([{ ...matPayload, status: 'unread' }]).select();
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       console.error(`❌ Material error (${mat.title}):`, error.message);
     } else {
