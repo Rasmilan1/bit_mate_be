@@ -48,12 +48,14 @@ router.get('/', async (req, res) => {
 // POST new subject
 router.post('/', async (req, res) => {
   const { name, color, semester_id, subject_number, week_info } = req.body;
-  if (!name) return res.status(400).json({ error: 'Subject name is required' });
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Subject name is required' });
+
+  const isValidSemUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(semester_id || '');
 
   const newSubject = {
     id: 'subj-' + Date.now(),
-    semester_id: semester_id || null,
-    name,
+    semester_id: isValidSemUuid ? semester_id : null,
+    name: name.trim(),
     subject_number: subject_number || '',
     week_info: week_info || '',
     color: color || '#4f46e5',
@@ -63,26 +65,29 @@ router.post('/', async (req, res) => {
   try {
     if (isConfigured && supabase) {
       const insertObj = {
-        name,
+        name: name.trim(),
         color: color || '#4f46e5',
         subject_number: subject_number || '',
         week_info: week_info || ''
       };
-      if (semester_id) insertObj.semester_id = semester_id;
+      if (isValidSemUuid) insertObj.semester_id = semester_id;
 
       const { data, error } = await supabase.from('subjects').insert([insertObj]).select();
       if (!error && data && data.length > 0) {
+        // Also update localDb memory
+        localDb.subjects.unshift(data[0]);
+        saveLocalDb();
         return res.status(201).json(data[0]);
       }
       console.warn('Supabase subject insert notice:', error ? error.message : 'No data returned');
     }
 
-    localDb.subjects.push(newSubject);
+    localDb.subjects.unshift(newSubject);
     saveLocalDb();
     return res.status(201).json(newSubject);
   } catch (err) {
-    console.error('Error creating subject, using resilient fallback:', err.message);
-    localDb.subjects.push(newSubject);
+    console.error('Error creating subject:', err.message);
+    localDb.subjects.unshift(newSubject);
     saveLocalDb();
     return res.status(201).json(newSubject);
   }
@@ -93,35 +98,46 @@ router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { name, color, semester_id, subject_number, week_info } = req.body;
 
+  const isValidSemUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(semester_id || '');
+
   const updates = {};
-  if (name !== undefined) updates.name = name;
+  if (name !== undefined) updates.name = name.trim();
   if (color !== undefined) updates.color = color;
-  if (semester_id !== undefined) updates.semester_id = semester_id;
   if (subject_number !== undefined) updates.subject_number = subject_number;
   if (week_info !== undefined) updates.week_info = week_info;
+  if (semester_id !== undefined) updates.semester_id = isValidSemUuid ? semester_id : null;
 
   try {
+    // 1. Always update localDb first to guarantee instant response
+    let item = (localDb.subjects || []).find(s => String(s.id) === String(id));
+    if (!item && localDb.subjects && localDb.subjects.length > 0) {
+      item = localDb.subjects.find(s => s.name === name);
+    }
+
+    if (item) {
+      Object.assign(item, updates);
+    } else {
+      item = { id, name: name || 'Subject', ...updates, created_at: new Date().toISOString() };
+      localDb.subjects.unshift(item);
+    }
+    saveLocalDb();
+
+    // 2. Safely update Supabase Cloud DB
     if (isConfigured && supabase) {
       try {
-        const { data, error } = await supabase.from('subjects').update(updates).eq('id', id).select();
-        if (!error && data && data.length > 0) {
-          const item = (localDb.subjects || []).find(s => s.id === id);
-          if (item) Object.assign(item, updates);
-          saveLocalDb();
-          return res.json(data[0]);
+        const isValidIdUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        if (isValidIdUuid) {
+          const { data, error } = await supabase.from('subjects').update(updates).eq('id', id).select();
+          if (!error && data && data.length > 0) {
+            return res.json({ ...item, ...data[0] });
+          }
         }
       } catch (e) {
         console.warn('Supabase subject update notice:', e.message);
       }
     }
 
-    const item = (localDb.subjects || []).find(s => s.id === id);
-    if (item) {
-      Object.assign(item, updates);
-      saveLocalDb();
-      return res.json(item);
-    }
-    return res.status(404).json({ error: 'Subject not found' });
+    return res.json(item);
   } catch (err) {
     console.error('Error updating subject:', err);
     return res.status(500).json({ error: err.message });
