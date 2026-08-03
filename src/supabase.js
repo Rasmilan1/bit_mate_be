@@ -18,17 +18,28 @@ if (isConfigured) {
     console.warn('⚠️ Supabase init warning:', err.message);
   }
 } else {
-  console.log('ℹ️ Running in Local Mode with mock fallback data. (Add SUPABASE_URL in server/.env for Cloud Sync)');
+  console.log('ℹ️ Running in Local Mode with mock fallback data.');
 }
 
-// Local Fallback Storage for immediate execution without setup
-const DATA_DIR = path.join(__dirname, '../data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// Resilient Storage setup for Read-Only Serverless (e.g., Vercel / AWS Lambda)
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? path.join('/tmp', 'data') : path.join(__dirname, '../data');
+
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Notice: Using read-only filesystem in serverless mode');
 }
-const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const UPLOADS_DIR = isVercel ? path.join('/tmp', 'uploads') : path.join(DATA_DIR, 'uploads');
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Notice: Uploads dir skipped in serverless mode');
 }
 
 const DB_FILE = path.join(DATA_DIR, 'local_db.json');
@@ -47,29 +58,21 @@ let localDb = {
   notes: {}
 };
 
-if (fs.existsSync(DB_FILE)) {
-  try {
+try {
+  if (fs.existsSync(DB_FILE)) {
     const loaded = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     localDb = { ...localDb, ...loaded };
-    if (!localDb.semesters || localDb.semesters.length === 0) {
-      localDb.semesters = [
-        { id: 'sem-1', name: 'Semester 1', order_index: 1, is_visible: true, created_at: new Date().toISOString() },
-        { id: 'sem-2', name: 'Semester 2', order_index: 2, is_visible: true, created_at: new Date().toISOString() },
-        { id: 'sem-3', name: 'Semester 3', order_index: 3, is_visible: true, created_at: new Date().toISOString() }
-      ];
-    } else {
-      localDb.semesters = localDb.semesters.map(s => ({
-        ...s,
-        is_visible: s.is_visible !== undefined ? s.is_visible : true
-      }));
-    }
-  } catch (e) {
-    console.error('Error reading local db:', e);
   }
+} catch (e) {
+  console.warn('Notice: Local DB file read notice:', e.message);
 }
 
 function saveLocalDb() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(localDb, null, 2), 'utf8');
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(localDb, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Notice: Local DB save skipped on serverless filesystem');
+  }
 }
 
 module.exports = {

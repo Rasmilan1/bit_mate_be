@@ -38,7 +38,21 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Study Hub Server running on http://localhost:${PORT}`);
-  console.log(`📡 Storage Mode: ${isConfigured ? 'Supabase Cloud Storage' : 'Local File Storage'}`);
+// Root fallback route for Vercel health check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'BitMat Backend API Server (Vercel Serverless)',
+    health: '/api/health'
+  });
 });
+
+// Only listen on port if not running as Vercel serverless function
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Study Hub Server running on http://localhost:${PORT}`);
+    console.log(`📡 Storage Mode: ${isConfigured ? 'Supabase Cloud Storage' : 'Local File Storage'}`);
+  });
+}
+
+module.exports = app;
