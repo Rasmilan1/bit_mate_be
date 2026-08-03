@@ -65,19 +65,29 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
     }
 
     const tagList = typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : (tags || []);
-    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subject_id || '');
+    
+    // Smart Subject ID Resolver: map string/legacy IDs to valid Supabase subject UUIDs
+    let resolvedSubjectId = subject_id || null;
+    if (resolvedSubjectId) {
+      const isSubjUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedSubjectId);
+      if (!isSubjUuid) {
+        const found = (localDb.subjects || []).find(s => String(s.id) === String(resolvedSubjectId) || s.name === resolvedSubjectId);
+        if (found) resolvedSubjectId = found.id;
+      }
+    }
+    const finalSubjectUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedSubjectId || '') ? resolvedSubjectId : null;
 
     let createdMat = {
       id: 'mat-' + Date.now(),
       title: title.trim(),
-      subject_id: subject_id || null,
+      subject_id: resolvedSubjectId || null,
       week_info: week_info || '',
-      file_url: fileUrl,
-      file_path: fileName,
-      file_size: fileSize,
+      file_url: fileUrl || '',
+      file_path: fileName || '',
+      file_size: fileSize || 0,
       total_pages: parseInt(total_pages) || 1,
       current_page: 1,
-      status: fileUrl ? 'unread' : 'no_pdf',
+      status: 'unread',
       tags: tagList,
       created_at: new Date().toISOString()
     };
@@ -104,7 +114,7 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
         // Insert database row into Supabase 'materials' table
         const insertData = {
           title: title.trim(),
-          subject_id: isValidUuid ? subject_id : null,
+          subject_id: finalSubjectUuid,
           week_info: week_info || '',
           file_url: fileUrl || '',
           file_path: fileName || '',
@@ -118,7 +128,7 @@ router.post('/upload', upload.single('pdfFile'), async (req, res) => {
         const { data: dbData, error: dbErr } = await supabase.from('materials').insert([insertData]).select();
         if (!dbErr && dbData && dbData.length > 0) {
           console.log('✅ PDF Study Material inserted into Supabase DB:', dbData[0].id);
-          createdMat = { ...dbData[0], subject_id: subject_id || null };
+          createdMat = { ...dbData[0], subject_id: resolvedSubjectId || dbData[0].subject_id || null };
         } else if (dbErr) {
           console.warn('Supabase material DB insert notice:', dbErr.message);
         }
