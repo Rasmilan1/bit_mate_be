@@ -63,21 +63,34 @@ router.patch('/:id/visibility', async (req, res) => {
   try {
     const { id } = req.params;
     const { is_visible } = req.body;
+    const boolVis = Boolean(is_visible);
+
+    let targetName = null;
+    if (localDb.semesters) {
+      const found = localDb.semesters.find(s => String(s.id) === String(id));
+      if (found) targetName = found.name;
+
+      localDb.semesters.forEach(s => {
+        if (String(s.id) === String(id) || (targetName && s.name === targetName)) {
+          s.is_visible = boolVis;
+        }
+      });
+      saveLocalDb();
+    }
 
     if (isConfigured && supabase) {
       try {
-        const { data, error } = await supabase.from('semesters').update({ is_visible }).eq('id', id).select();
-        if (!error && data && data.length > 0) {
-          return res.json(data[0]);
+        if (targetName) {
+          await supabase.from('semesters').update({ is_visible: boolVis }).eq('name', targetName);
         }
-      } catch (e) {}
+        await supabase.from('semesters').update({ is_visible: boolVis }).eq('id', id);
+      } catch (e) {
+        console.warn('Supabase visibility update notice:', e.message);
+      }
     }
 
-    const sem = (localDb.semesters || []).find(s => s.id === id);
-    if (!sem) return res.status(404).json({ error: 'Semester not found' });
-    sem.is_visible = is_visible;
-    saveLocalDb();
-    return res.json(sem);
+    const sem = (localDb.semesters || []).find(s => String(s.id) === String(id));
+    return res.json(sem || { id, is_visible: boolVis });
   } catch (err) {
     console.error('Error toggling semester visibility:', err);
     res.status(500).json({ error: err.message });
