@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
         query = query.eq('semester_id', semester_id);
       }
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return res.json(sortSubjects(data));
       }
       console.warn('Supabase subjects fetch notice, using localDb subjects:', error ? error.message : 'Empty Supabase table');
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
     
     let allSubjects = localDb.subjects || [];
     if (semester_id) {
-      allSubjects = allSubjects.filter(s => s.semester_id === semester_id || !s.semester_id);
+      allSubjects = allSubjects.filter(s => String(s.semester_id) === String(semester_id));
     }
     return res.json(sortSubjects(allSubjects));
   } catch (err) {
@@ -50,11 +50,9 @@ router.post('/', async (req, res) => {
   const { name, color, semester_id, subject_number, week_info } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Subject name is required' });
 
-  const isValidSemUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(semester_id || '');
-
   const newSubject = {
     id: 'subj-' + Date.now(),
-    semester_id: isValidSemUuid ? semester_id : null,
+    semester_id: semester_id || null,
     name: name.trim(),
     subject_number: subject_number || '',
     week_info: week_info || '',
